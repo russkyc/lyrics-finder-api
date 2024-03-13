@@ -41,6 +41,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseHttpsRedirection();
+
 app.MapGet("/lyrics/{providers}/{artist}/{song}",
     async (
         ILyricsScraperClient client,
