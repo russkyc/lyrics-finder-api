@@ -20,13 +20,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using LyricFinderAPI.Models;
 using LyricFinderAPI.Services;
+using LyricsScraperNET;
+using LyricsScraperNET.Models.Requests;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddLyricScraper();
-builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -39,6 +41,106 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseAuthorization();
-app.MapControllers();
+app.MapGet("/lyrics/{providers}/{artist}/{song}",
+    async (
+        ILyricsScraperClient client,
+        string providers,
+        string artist,
+        string song) =>
+    {
+        if (providers.Contains("azlyrics"))
+        {
+            client.WithAZLyrics();
+        }
+
+        if (providers.Contains("genius"))
+        {
+            client.WithGenius();
+        }
+
+        if (providers.Contains("musixmatch"))
+        {
+            client.WithMusixmatch();
+        }
+
+        if (providers.Contains("lyricfind"))
+        {
+            client.WithLyricFind();
+        }
+
+        if (providers.Contains("songlyrics"))
+        {
+            client.WithSongLyrics();
+        }
+
+        var request = new ArtistAndSongSearchRequest(artist: artist, song: song);
+        var searchResult = await client.SearchLyricAsync(request);
+
+        if (searchResult.IsEmpty())
+        {
+            return Results.NotFound();
+        }
+
+        var lyricInfo = new LyricInfo
+        {
+            Title = request.Song,
+            Author = request.Artist,
+            Lyric = searchResult.LyricText
+        };
+
+        return Results.Ok(lyricInfo);
+    });
+
+app.MapGet("/lyrics/{artist}/{song}",
+    async (
+        ILyricsScraperClient client,
+        string artist,
+        string song) =>
+    {
+        client.WithAllProviders();
+
+        var request = new ArtistAndSongSearchRequest(artist: artist, song: song);
+        var searchResult = await client.SearchLyricAsync(request);
+
+        if (searchResult.IsEmpty())
+        {
+            return Results.NotFound();
+        }
+
+        var lyricInfo = new LyricInfo
+        {
+            Title = request.Song,
+            Author = request.Artist,
+            Lyric = searchResult.LyricText
+        };
+
+        return Results.Ok(lyricInfo);
+    });
+
+app.MapPost("/lyrics",
+    async (
+        ILyricsScraperClient client,
+        ArtistAndSongSearchRequest request) =>
+    {
+        client.WithAZLyrics()
+            .WithGenius()
+            .WithMusixmatch();
+
+        var searchResult = await client.SearchLyricAsync(request);
+
+        if (searchResult.IsEmpty())
+        {
+            return Results.NotFound();
+        }
+
+        var lyricInfo = new LyricInfo
+        {
+            Title = request.Song,
+            Author = request.Artist,
+            Lyric = searchResult.LyricText
+        };
+
+        return Results.Ok(lyricInfo);
+    });
+
 app.Run();
